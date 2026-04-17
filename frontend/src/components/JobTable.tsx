@@ -1,72 +1,97 @@
-import type { JobApplication, Status } from '../types';
+import type { JobApplication } from '../types';
+import { updateJobStatus } from '../api/jobs';
 
 interface Props {
   jobs: JobApplication[];
   onEdit: (job: JobApplication) => void;
   onDelete: (id: number) => void;
+  onRefresh: () => void; // Added refresh prop
 }
 
-const statusColors: Record<Status, string> = {
-  Applied:   'bg-blue-100 text-blue-700',
-  Interview: 'bg-yellow-100 text-yellow-700',
-  Offer:     'bg-green-100 text-green-700',
-  Rejected:  'bg-red-100 text-red-700',
-};
+const STATUS_OPTIONS = [
+  'New', 'Applied', 'Followed up (1)', 'Followed up (2)', 'Followed up (3)', 'Followed up (4)',
+  'Invited to first interview', 'Invited to second interview', 'Technical Test', 
+  'Offer', 'Rejected', 'Rejected after first interview', 'Closed / No interest', 'No response'
+];
 
-export default function JobTable({ jobs, onEdit, onDelete }: Props) {
-  if (jobs.length === 0) {
-    return (
-      <div className="text-center py-16 text-gray-400">
-        <div className="text-5xl mb-4">📋</div>
-        <div className="text-lg font-medium">No applications yet</div>
-        <div className="text-sm">Click "Add Application" to get started</div>
-      </div>
-    );
-  }
+export default function JobTable({ jobs, onEdit, onDelete, onRefresh }: Props) {
+  
+  const getStatusStyle = (status: string) => {
+    const s = status.toLowerCase();
+    if (s === 'new') return 'bg-slate-50 text-slate-700';
+    if (s === 'applied') return 'bg-blue-50 text-blue-700';
+    if (s.includes('followed up')) return 'bg-emerald-50 text-emerald-700';
+    if (s.includes('interview') || s.includes('test')) return 'bg-yellow-50 text-yellow-700';
+    if (s === 'offer') return 'bg-green-50 text-green-700';
+    if (s.includes('rejected') || s.includes('closed')) return 'bg-red-50 text-red-700';
+    return 'bg-gray-50 text-gray-700';
+  };
+
+  const handleStatusChange = async (id: number, newStatus: string) => {
+    try {
+      await updateJobStatus(id, newStatus);
+      onRefresh(); // Trigger the parent fetch
+    } catch (err) {
+      console.error("Status update failed", err);
+      alert("Failed to update status.");
+    }
+  };
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-gray-200">
+    <div className="overflow-x-auto rounded-3xl border border-gray-100 bg-white shadow-sm">
       <table className="w-full text-sm">
-        <thead className="bg-gray-50 text-gray-600 uppercase text-xs">
+        <thead className="bg-gray-50/50 text-gray-400 uppercase text-[10px] font-black tracking-widest border-b border-gray-100">
           <tr>
-            <th className="px-4 py-3 text-left">Company</th>
-            <th className="px-4 py-3 text-left">Job Title</th>
-            <th className="px-4 py-3 text-left">Location</th>
-            <th className="px-4 py-3 text-left">Salary</th>
-            <th className="px-4 py-3 text-left">Status</th>
-            <th className="px-4 py-3 text-left">Date Applied</th>
-            <th className="px-4 py-3 text-left">Actions</th>
+            <th className="px-6 py-4 text-left">Company</th>
+            <th className="px-6 py-4 text-left">URL</th>
+            <th className="px-6 py-4 text-left">PDF</th>
+            <th className="px-6 py-4 text-left">Location</th>
+            <th className="px-6 py-4 text-left">Status</th>
+            <th className="px-6 py-4 text-left">Date</th>
+            <th className="px-6 py-4 text-center">Actions</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-100">
+        <tbody className="divide-y divide-gray-50">
           {jobs.map(job => (
-            <tr key={job.id} className="hover:bg-gray-50 transition-colors">
-              <td className="px-4 py-3 font-medium">{job.company_name}</td>
-              <td className="px-4 py-3 text-gray-600">{job.job_title}</td>
-              <td className="px-4 py-3 text-gray-600">{job.location}</td>
-              <td className="px-4 py-3 text-gray-600">
-                {job.salary ? `£${Number(job.salary).toLocaleString()}` : '—'}
+            <tr key={job.id} className="hover:bg-gray-50/30 transition-colors">
+              <td className="px-6 py-5 font-bold text-gray-900">{job.company_name}</td>
+              <td className="px-6 py-5">
+                {job.job_url ? (
+                  <a href={job.job_url} target="_blank" rel="noreferrer" className="text-blue-600 font-bold hover:underline italic">Link ↗</a>
+                ) : (
+                  <span className="text-gray-200">—</span>
+                )}
               </td>
-              <td className="px-4 py-3">
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[job.status]}`}>
-                  {job.status}
-                </span>
+              <td className="px-6 py-5">
+                {job.resume_pdf ? (
+                  <a href={job.resume_pdf} target="_blank" rel="noreferrer" className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-xl text-[10px] font-black uppercase border border-emerald-100">View PDF</a>
+                ) : (
+                  <span className="text-gray-300 italic text-xs">None</span>
+                )}
               </td>
-              <td className="px-4 py-3 text-gray-600">{job.date_applied}</td>
-              <td className="px-4 py-3">
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => onEdit(job)}
-                    className="px-3 py-1 text-xs rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
+              <td className="px-6 py-5 text-gray-500 font-medium">{job.location}</td>
+              
+              <td className="px-6 py-5">
+                <div className="relative inline-block w-full min-w-[150px]">
+                  <select
+                    value={job.status}
+                    onChange={(e) => handleStatusChange(job.id, e.target.value)}
+                    className={`w-full appearance-none cursor-pointer border-none rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-tight focus:ring-2 focus:ring-blue-500 shadow-sm transition-colors ${getStatusStyle(job.status)}`}
                   >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => onDelete(job.id)}
-                    className="px-3 py-1 text-xs rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
-                  >
-                    Delete
-                  </button>
+                    {STATUS_OPTIONS.map(opt => (
+                      <option key={opt} value={opt} className="bg-white text-gray-900 font-bold uppercase">
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </td>
+
+              <td className="px-6 py-5 text-gray-400 text-xs font-bold">{job.date_applied}</td>
+              <td className="px-6 py-5">
+                <div className="flex justify-center gap-3">
+                  <button onClick={() => onEdit(job)} className="text-[11px] font-black uppercase text-blue-600 hover:text-blue-800">Edit</button>
+                  <button onClick={() => onDelete(job.id)} className="text-[11px] font-black uppercase text-red-400 hover:text-red-600">Del</button>
                 </div>
               </td>
             </tr>

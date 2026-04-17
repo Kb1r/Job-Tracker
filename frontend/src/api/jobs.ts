@@ -1,23 +1,53 @@
 import axios from 'axios';
-import type { JobApplication, JobApplicationFormData, Stats } from '../types';
 
 const api = axios.create({
-  baseURL: 'http://localhost:8000/api',
+  baseURL: 'http://localhost:8000/api/jobs',
 });
 
-export const getJobs = (status?: string) =>
-  api.get<JobApplication[]>('/jobs/', {
-    params: status ? { status } : {},
-  }).then(res => res.data);
+// Helper to convert JSON objects to FormData for file uploads
+const createFormData = (data: any) => {
+  const formData = new FormData();
+  Object.keys(data).forEach(key => {
+    if (data[key] !== null && data[key] !== undefined) {
+      formData.append(key, data[key]);
+    }
+  });
+  return formData;
+};
 
-export const createJob = (data: JobApplicationFormData) =>
-  api.post<JobApplication>('/jobs/', data).then(res => res.data);
+export const getJobs = async (status?: string) => {
+  const response = await api.get('/', { params: { status } });
+  return response.data;
+};
 
-export const updateJob = (id: number, data: JobApplicationFormData) =>
-  api.put<JobApplication>(`/jobs/${id}/`, data).then(res => res.data);
+export const getStats = async () => {
+  const response = await api.get('/stats/');
+  return response.data;
+};
 
-export const deleteJob = (id: number) =>
-  api.delete(`/jobs/${id}/`);
+export const createJob = async (data: any) => {
+  const response = await api.post('/', createFormData(data), {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+  return response.data;
+};
 
-export const getStats = () =>
-  api.get<Stats>('/stats/').then(res => res.data);
+export const updateJob = async (id: number, data: any) => {
+  const response = await api.patch(`/${id}/`, createFormData(data), {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+  return response.data;
+};
+
+/**
+ * Quick Status Update
+ * Matches the backend url_path='update-status'
+ */
+export const updateJobStatus = async (id: number, status: string) => {
+  const response = await api.patch(`/${id}/update-status/`, { status });
+  return response.data;
+};
+
+export const deleteJob = async (id: number) => {
+  await api.delete(`/${id}/`);
+};

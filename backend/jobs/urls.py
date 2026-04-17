@@ -1,8 +1,12 @@
-from django.urls import path
-from . import views
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import JobApplicationViewSet
+
+router = DefaultRouter()
+router.register(r'', JobApplicationViewSet, basename='jobapplication')
 
 urlpatterns = [
-    path('jobs/',      views.JobApplicationListCreateView.as_view(), name='job-list-create'),
-    path('jobs/<int:pk>/', views.JobApplicationDetailView.as_view(),  name='job-detail'),
-    path('stats/',     views.stats_view,                              name='stats'),
+    # Stats must be above the router
+    path('stats/', JobApplicationViewSet.as_view({'get': 'stats'}), name='job-stats'),
+    path('', include(router.urls)),
 ]

@@ -1,7 +1,6 @@
 from rest_framework import serializers
 from .models import JobApplication
 
-
 class JobApplicationSerializer(serializers.ModelSerializer):
 
     class Meta:
@@ -10,6 +9,8 @@ class JobApplicationSerializer(serializers.ModelSerializer):
             'id',
             'company_name',
             'job_title',
+            'job_url',
+            'resume_pdf',
             'location',
             'salary',
             'status',
