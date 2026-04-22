@@ -7,13 +7,16 @@ backend/**/__pycache__/
 
 # Django
 backend/*.sqlite3
+backend/media/
+backend/staticfiles/
 
 # Node
 frontend/node_modules/
 
-# Environment variables
+# Environment variables — ignore actual env files but commit the example template
 .env
 .env.*
+!.env.example
 
 # Mac
 .DS_Store
