@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import type { JobApplication, JobApplicationFormData, Stats } from './types';
-import { getJobs, createJob, updateJob, deleteJob, getStats } from './api/jobs';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import type { JobApplication, JobApplicationFormData, Stats, Status } from './types';
+import { isStatus } from './types';
+import { getJobs, createJob, updateJob, deleteJob, getStats, updateJobStatus } from './api/jobs';
 import StatsBar from './components/StatsBar';
 import JobTable from './components/JobTable';
 import JobModal from './components/JobModal';
@@ -14,77 +15,141 @@ export default function App() {
   const [modalOpen, setModalOpen]   = useState(false);
   const [editingJob, setEditingJob] = useState<JobApplication | null>(null);
   const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState<string | null>(null);
+  const [toast, setToast]           = useState<string | null>(null);
+  const toastTimeoutRef             = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = useCallback((message: string) => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    setToast(message);
+    toastTimeoutRef.current = setTimeout(() => setToast(null), 3000);
+  }, []);
+
+  useEffect(() => () => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+  }, []);
 
   const fetchData = useCallback(async () => {
     try {
       const [jobsData, statsData] = await Promise.all([getJobs(), getStats()]);
       setJobs(jobsData);
       setStats(statsData);
-    } catch (err) {
-      console.error("Fetch failed", err);
+      setError(null);
+    } catch {
+      setError('Network error: Unable to synchronize your pipeline.');
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchData();
+    void fetchData();
   }, [fetchData]);
 
   const filteredJobs = useMemo(() => {
     return jobs.filter(job => {
-      const status = job.status.trim();
+      const s = job.status.trim();
       if (filter === 'All') return true;
-      if (filter === 'Follow-up') return status.startsWith('Followed up');
-      if (filter === 'Interview') return status.toLowerCase().includes('interview');
-      return status === filter;
+      if (filter === 'Follow-up') return s.includes('Followed up');
+      if (filter === 'Interview') return s.toLowerCase().includes('interview') || s === 'Technical Test';
+      return s === filter;
     });
   }, [jobs, filter]);
 
-  const handleSave = async (data: JobApplicationFormData) => {
+  // Propagates errors to JobModal — no catch here so the modal can display field-level errors.
+  const handleSave = useCallback(async (data: JobApplicationFormData) => {
+    const wasEditing = !!editingJob;
+    if (editingJob) {
+      await updateJob(editingJob.id, data);
+    } else {
+      await createJob(data);
+    }
+    setModalOpen(false);
+    setEditingJob(null);
+    await fetchData();
+    showToast(wasEditing ? 'Entry updated successfully' : 'New lead added to pipeline');
+  }, [editingJob, fetchData, showToast]);
+
+  const handleDelete = async (id: number) => {
+    if (!window.confirm('Permanent delete? This action cannot be undone.')) return;
     try {
-      editingJob ? await updateJob(editingJob.id, data) : await createJob(data);
-      setModalOpen(false);
-      setEditingJob(null);
-      await fetchData(); // Sync state after save
-    } catch (err) {
-      alert('Save failed.');
+      await deleteJob(id);
+      await fetchData();
+      showToast('Application removed');
+    } catch {
+      showToast('Error removing entry');
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('Delete?')) return;
-    await deleteJob(id);
-    await fetchData(); // Sync state after delete
-  };
+  // Optimistic update: apply immediately, roll back if the API rejects.
+  // Guard at the boundary with isStatus so the Status union is preserved without casting.
+  // Race-condition safe: only rolls back if no newer change has already overwritten newStatus.
+  const handleStatusChange = useCallback(async (id: number, newStatus: string) => {
+    if (!isStatus(newStatus)) return;
+
+    let oldStatus: Status | undefined;
+    setJobs(prev => {
+      oldStatus = prev.find(j => j.id === id)?.status;
+      return prev.map(j => j.id === id ? { ...j, status: newStatus } : j);
+    });
+
+    try {
+      await updateJobStatus(id, newStatus);
+      const statsData = await getStats();
+      setStats(statsData);
+    } catch {
+      setJobs(prev => prev.map(j => {
+        if (j.id !== id) return j;
+        if (j.status !== newStatus) return j; // a newer change already won — don't clobber it
+        if (oldStatus === undefined) return j;
+        return { ...j, status: oldStatus };
+      }));
+      showToast('Failed to update status. Please try again.');
+    }
+  }, [showToast]);
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="min-h-screen bg-gray-50 pb-20 font-sans selection:bg-blue-100">
+      {toast && (
+        <div className="fixed bottom-8 right-8 bg-gray-900 text-white px-6 py-3 rounded-2xl shadow-2xl z-[100] animate-in slide-in-from-bottom-5 font-bold text-xs uppercase tracking-widest">
+          {toast}
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-600 rounded-2xl font-black text-[10px] uppercase tracking-widest text-center">
+            {error}
+          </div>
+        )}
+
+        <div className="flex items-center justify-between mb-10">
           <div>
-            <h1 className="text-3xl font-black text-gray-900 tracking-tight uppercase">Job Tracker</h1>
-            <p className="text-gray-500 text-sm font-medium italic">Pipeline Management</p>
+            <h1 className="text-4xl font-black text-gray-900 tracking-tighter uppercase italic">Job Tracker</h1>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
+              <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest">System Operational</p>
+            </div>
           </div>
           <button
             onClick={() => { setEditingJob(null); setModalOpen(true); }}
-            className="bg-blue-600 text-white px-6 py-3 rounded-2xl hover:bg-blue-700 transition-all font-bold shadow-lg shadow-blue-200 text-sm"
+            className="bg-blue-600 text-white px-8 py-4 rounded-2xl hover:bg-blue-700 transition-all font-black shadow-xl shadow-blue-100 text-[11px] uppercase tracking-widest active:scale-95 hover:-translate-y-1"
           >
-            + ADD APPLICATION
+            + Add Opportunity
           </button>
         </div>
 
         {stats && <StatsBar stats={stats} />}
 
-        <div className="flex flex-wrap gap-2 mb-8 bg-white p-2 rounded-2xl border border-gray-100 shadow-sm w-fit">
+        <div className="flex flex-wrap gap-2 mb-10 bg-white p-2 rounded-3xl border border-gray-100 shadow-sm w-fit">
           {STATUS_FILTERS.map(s => (
             <button
               key={s}
               onClick={() => setFilter(s)}
-              className={`px-5 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${
+              className={`px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
                 filter === s
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'bg-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-100'
+                  : 'bg-transparent text-gray-400 hover:text-gray-900 hover:bg-gray-50'
               }`}
             >
               {s}
@@ -93,21 +158,28 @@ export default function App() {
         </div>
 
         {loading ? (
-          <div className="text-center py-20 text-gray-300 font-bold uppercase tracking-widest">Syncing Pipeline...</div>
+          <div className="grid grid-cols-1 gap-4">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="h-24 w-full bg-white rounded-3xl border border-gray-100 animate-pulse"></div>
+            ))}
+          </div>
         ) : (
-          <JobTable 
-            jobs={filteredJobs} 
-            onEdit={(job) => { setEditingJob(job); setModalOpen(true); }} 
+          <JobTable
+            jobs={filteredJobs}
+            totalJobs={jobs.length}
+            activeFilter={filter}
+            onEdit={(job) => { setEditingJob(job); setModalOpen(true); }}
             onDelete={handleDelete}
-            onRefresh={fetchData} // Pass the refresh function
+            onStatusChange={handleStatusChange}
+            onClearFilter={() => setFilter('All')}
           />
         )}
 
         {modalOpen && (
-          <JobModal 
-            job={editingJob} 
-            onSave={handleSave} 
-            onClose={() => { setModalOpen(false); setEditingJob(null); }} 
+          <JobModal
+            job={editingJob}
+            onSave={handleSave}
+            onClose={() => { setModalOpen(false); setEditingJob(null); }}
           />
         )}
       </div>
