@@ -1,16 +1,11 @@
+from django.conf import settings
 from django.db import models
 from django.core.validators import FileExtensionValidator
-from django.core.exceptions import ValidationError
+from .validators import validate_pdf_size
 
-def validate_pdf_size(value):
-    """
-    Validator to ensure PDF files do not exceed 5MB.
-    """
-    filesize = value.size
-    # 5MB = 5 * 1024 * 1024 bytes
-    if filesize > 5242880:
-        raise ValidationError("The maximum file size that can be uploaded is 5MB")
-    return value
+# Re-export so migration 0007 (which references jobs.models.validate_pdf_size) keeps working.
+__all__ = ['validate_pdf_size', 'JobApplication']
+
 
 class JobApplication(models.Model):
     STATUS_CHOICES = [
@@ -30,32 +25,34 @@ class JobApplication(models.Model):
         ('No response', 'No response'),
     ]
 
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='jobs',
+        null=True,
+        blank=True,
+    )
+
     company_name = models.CharField(max_length=200)
     job_title    = models.CharField(max_length=200)
     job_url      = models.URLField(max_length=500, blank=True, null=True)
-    
-    #PDF Validation
     resume_pdf   = models.FileField(
-        upload_to='resumes/', 
-        null=True, 
+        upload_to='resumes/',
+        null=True,
         blank=True,
         validators=[
             FileExtensionValidator(allowed_extensions=['pdf']),
-            validate_pdf_size
-        ]
+            validate_pdf_size,
+        ],
     )
-    
     location     = models.CharField(max_length=200)
     salary       = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    
-    # Added db_index for performance as the dataset grows
     status       = models.CharField(
-        max_length=50, 
-        choices=STATUS_CHOICES, 
+        max_length=50,
+        choices=STATUS_CHOICES,
         default='New',
-        db_index=True 
+        db_index=True,
     )
-    
     date_applied = models.DateField(db_index=True)
     notes        = models.TextField(blank=True, default='')
     created_at   = models.DateTimeField(auto_now_add=True)
@@ -65,4 +62,4 @@ class JobApplication(models.Model):
         ordering = ['-date_applied']
 
     def __str__(self):
-        return f"{self.job_title} at {self.company_name}"
+        return f'{self.job_title} at {self.company_name}'
