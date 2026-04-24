@@ -29,8 +29,6 @@ class JobApplication(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='jobs',
-        null=True,
-        blank=True,
     )
 
     company_name = models.CharField(max_length=200)

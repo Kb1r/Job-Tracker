@@ -5,22 +5,15 @@ from django.db.models import Count, Q
 from .models import JobApplication
 from .serializers import JobApplicationSerializer
 
-# Build once at import time rather than on every request.
-VALID_STATUSES = frozenset(c[0] for c in JobApplication.STATUS_CHOICES)
-
 
 class JobApplicationViewSet(viewsets.ModelViewSet):
     serializer_class = JobApplicationSerializer
 
     def get_queryset(self):
-        # TODO: Once frontend auth is live, replace with the filtered version below
-        # and flip DEFAULT_PERMISSION_CLASSES to IsAuthenticated in settings.py.
-        #   return JobApplication.objects.filter(owner=self.request.user).order_by('-date_applied')
-        return JobApplication.objects.all().order_by('-date_applied')
+        return JobApplication.objects.filter(owner=self.request.user).order_by('-date_applied')
 
     def perform_create(self, serializer):
-        owner = self.request.user if self.request.user.is_authenticated else None
-        serializer.save(owner=owner)
+        serializer.save(owner=self.request.user)
 
     @action(detail=False, methods=['get'])
     def stats(self, request):
@@ -39,12 +32,8 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['patch'], url_path='update-status')
     def update_status(self, request, pk=None):
         job = self.get_object()
-        new_status = request.data.get('status')
-        if new_status not in VALID_STATUSES:
-            return Response(
-                {'status': [f'Invalid status: {new_status}']},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        job.status = new_status
+        serializer = self.get_serializer(job, data={'status': request.data.get('status')}, partial=True)
+        serializer.is_valid(raise_exception=True)
+        job.status = serializer.validated_data['status']
         job.save(update_fields=['status', 'updated_at'])
         return Response(self.get_serializer(job).data)

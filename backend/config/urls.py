@@ -1,11 +1,22 @@
 from django.contrib import admin
 from django.urls import path, include
+from django.http import JsonResponse
 from django.conf import settings
 from django.conf.urls.static import static
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+
+
+def healthz(request):
+    return JsonResponse({'status': 'ok'})
+
 
 urlpatterns = [
+    path('healthz/', healthz, name='healthz'),
     path('admin/', admin.site.urls),
-    path('api/jobs/', include('jobs.urls')), # This makes everything start with /api/jobs/
+    path('api/auth/', include('jobs.auth_urls')),
+    path('api/jobs/', include('jobs.urls')),
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/schema/swagger-ui/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
 ]
 
 if settings.DEBUG:
