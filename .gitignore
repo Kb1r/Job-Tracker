@@ -12,6 +12,7 @@ backend/staticfiles/
 
 # Node
 frontend/node_modules/
+frontend/tsconfig.tsbuildinfo
 
 # Environment variables — ignore actual env files but commit the example template
 .env
