@@ -1,7 +1,8 @@
 import axios, { AxiosError } from 'axios';
 import type { JobApplication, JobApplicationFormData, Stats } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/jobs';
+// VITE_API_URL should be the server root, e.g. https://your-app.railway.app
+const SERVER_URL = (import.meta.env.VITE_API_URL as string | undefined) || 'http://localhost:8000';
 
 export class ApiValidationError extends Error {
   constructor(
@@ -13,20 +14,37 @@ export class ApiValidationError extends Error {
   }
 }
 
+let _token: string | null = null;
+let _onUnauthorized: (() => void) | null = null;
+
+export const setApiToken = (token: string | null) => { _token = token; };
+export const setUnauthorizedHandler = (handler: () => void) => { _onUnauthorized = handler; };
+
 const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: `${SERVER_URL}/api/jobs`,
+});
+
+api.interceptors.request.use((config) => {
+  if (_token) {
+    config.headers.Authorization = `Token ${_token}`;
+  }
+  return config;
 });
 
 api.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
+    if (error.response?.status === 401) {
+      _onUnauthorized?.();
+      return Promise.reject(error);
+    }
     if (error.response?.status === 400 && error.response.data) {
       const data = error.response.data as Record<string, string | string[]>;
       const fieldErrors: Record<string, string> = {};
       let message = 'Please correct the errors below.';
 
       for (const [key, val] of Object.entries(data)) {
-        if (key === 'detail' || key === 'error') {
+        if (key === 'detail' || key === 'error' || key === 'non_field_errors') {
           message = Array.isArray(val) ? val[0] : val;
         } else if (Array.isArray(val) && val.length > 0) {
           fieldErrors[key] = val[0];
