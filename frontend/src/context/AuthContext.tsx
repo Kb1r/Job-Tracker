@@ -2,29 +2,36 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import type { ReactNode } from 'react';
 import { setApiToken, setUnauthorizedHandler } from '../api/jobs';
 
-const STORAGE_KEY = 'auth_token';
+const STORAGE_KEY_TOKEN = 'auth_token';
+const STORAGE_KEY_NAME = 'auth_first_name';
 
 interface AuthContextValue {
   token: string | null;
-  login: (token: string) => void;
+  firstName: string | null;
+  login: (token: string, firstName: string) => void;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem(STORAGE_KEY));
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem(STORAGE_KEY_TOKEN));
+  const [firstName, setFirstName] = useState<string | null>(() => localStorage.getItem(STORAGE_KEY_NAME));
 
-  const login = useCallback((newToken: string) => {
-    localStorage.setItem(STORAGE_KEY, newToken);
+  const login = useCallback((newToken: string, newFirstName: string) => {
+    localStorage.setItem(STORAGE_KEY_TOKEN, newToken);
+    localStorage.setItem(STORAGE_KEY_NAME, newFirstName);
     setApiToken(newToken);
     setToken(newToken);
+    setFirstName(newFirstName);
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(STORAGE_KEY_TOKEN);
+    localStorage.removeItem(STORAGE_KEY_NAME);
     setApiToken(null);
     setToken(null);
+    setFirstName(null);
   }, []);
 
   // Sync the token into the API module on mount and register the 401 handler.
@@ -34,7 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [token, logout]);
 
   return (
-    <AuthContext.Provider value={{ token, login, logout }}>
+    <AuthContext.Provider value={{ token, firstName, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

@@ -27,10 +27,10 @@ export default function LoginPage() {
     setSubmitting(true);
 
     try {
-      const token = mode === 'login'
+      const { token, firstName: returnedName } = mode === 'login'
         ? await loginUser(email, password)
         : await registerUser(email, password, firstName);
-      login(token);
+      login(token, returnedName);
     } catch (err) {
       if (err instanceof ApiValidationError) {
         setFieldErrors(err.fieldErrors);

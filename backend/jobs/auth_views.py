@@ -48,7 +48,10 @@ class Register(APIView):
             first_name=first_name,
         )
         token, _ = Token.objects.get_or_create(user=user)
-        return Response({'token': token.key}, status=status.HTTP_201_CREATED)
+        return Response(
+            {'token': token.key, 'first_name': user.first_name},
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class Login(APIView):
@@ -72,4 +75,4 @@ class Login(APIView):
             )
 
         token, _ = Token.objects.get_or_create(user=user)
-        return Response({'token': token.key})
+        return Response({'token': token.key, 'first_name': user.first_name})

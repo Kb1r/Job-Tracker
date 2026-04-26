@@ -10,7 +10,7 @@ import JobModal from './JobModal';
 const STATUS_FILTERS = ['All', 'New', 'Applied', 'Follow-up', 'Interview', 'Offer', 'Rejected'];
 
 export default function Dashboard() {
-  const { logout } = useAuth();
+  const { logout, firstName } = useAuth();
 
   const [jobs, setJobs]             = useState<JobApplication[]>([]);
   const [stats, setStats]           = useState<Stats | null>(null);
@@ -127,7 +127,9 @@ export default function Dashboard() {
             <h1 className="text-4xl font-black text-gray-900 tracking-tighter uppercase italic">Job Tracker</h1>
             <div className="flex items-center gap-2 mt-1">
               <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
-              <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest">System Operational</p>
+              <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest">
+                {firstName ? `Signed in as ${firstName}` : 'System Operational'}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-3">

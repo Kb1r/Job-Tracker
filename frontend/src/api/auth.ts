@@ -30,16 +30,26 @@ authApi.interceptors.response.use(
   }
 );
 
-export const loginUser = async (email: string, password: string): Promise<string> => {
-  const response = await authApi.post<{ token: string }>('/login/', { email, password });
-  return response.data.token;
+export interface AuthResponse {
+  token: string;
+  firstName: string;
+}
+
+interface AuthApiPayload {
+  token: string;
+  first_name: string;
+}
+
+export const loginUser = async (email: string, password: string): Promise<AuthResponse> => {
+  const response = await authApi.post<AuthApiPayload>('/login/', { email, password });
+  return { token: response.data.token, firstName: response.data.first_name };
 };
 
-export const registerUser = async (email: string, password: string, firstName: string): Promise<string> => {
-  const response = await authApi.post<{ token: string }>('/register/', {
+export const registerUser = async (email: string, password: string, firstName: string): Promise<AuthResponse> => {
+  const response = await authApi.post<AuthApiPayload>('/register/', {
     email,
     password,
     first_name: firstName,
   });
-  return response.data.token;
+  return { token: response.data.token, firstName: response.data.first_name };
 };
