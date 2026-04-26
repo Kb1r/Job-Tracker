@@ -1,91 +1,135 @@
-# 🗂️ Job Tracker
+# Job Tracker
 
-A full-stack job application tracking web app built with **Django REST Framework**, **React + TypeScript**, **PostgreSQL**, and **Docker**. Track every application, monitor interview progress, and visualise your job search at a glance.
+A full-stack job application tracking app with token-based authentication, per-user data isolation, and a free-tier production deployment. Built with Django REST Framework, React 19 + TypeScript, and PostgreSQL.
 
-![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat&logo=python&logoColor=white)
+**Live demo:** [job-tracker-bay-one.vercel.app](https://job-tracker-bay-one.vercel.app)
+
+![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=flat&logo=python&logoColor=white)
 ![Django](https://img.shields.io/badge/Django-5.1-092E20?style=flat&logo=django&logoColor=white)
-![React](https://img.shields.io/badge/React-18-61DAFB?style=flat&logo=react&logoColor=black)
+![DRF](https://img.shields.io/badge/DRF-3.15-A30000?style=flat&logo=django&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?style=flat&logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat&logo=typescript&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat&logo=postgresql&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat&logo=docker&logoColor=white)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3-06B6D4?style=flat&logo=tailwindcss&logoColor=white)
-
----
-## ✨ Features
-
-- **Full CRUD** — Create, read, update and delete job applications
-- **Status tracking** — Applied → Interview → Offer / Rejected pipeline
-- **Stats bar** — Live counts of applications by status
-- **Filter by status** — Instantly filter the table by any stage
-- **Salary display** — Optional salary field formatted with £ symbol
-- **Responsive UI** — Clean Tailwind CSS design that works on any screen
-- **Persistent storage** — PostgreSQL database survives container restarts
-- **One-command startup** — Entire stack runs with `docker compose up`
+![Tailwind](https://img.shields.io/badge/Tailwind-3-06B6D4?style=flat&logo=tailwindcss&logoColor=white)
+![Vercel](https://img.shields.io/badge/Vercel-deployed-000?style=flat&logo=vercel&logoColor=white)
+![Render](https://img.shields.io/badge/Render-deployed-46E3B7?style=flat&logo=render&logoColor=white)
 
 ---
 
-## 🏗️ Tech Stack
+## Features
+
+- **Email + password auth** — register and sign in with token authentication; passwords validated server-side (length, common-password, similarity, numeric-only checks)
+- **Per-user isolation** — every job application is scoped to the authenticated owner; one user can't see another user's data
+- **Full CRUD pipeline** — create, edit, delete applications; quick-toggle status from the row
+- **Status filters** — All / New / Applied / Follow-up / Interview / Offer / Rejected; the "Interview" filter also includes Technical Test
+- **Live stats** — counts by status update on every change
+- **Resume uploads** — attach a PDF per application; stored on disk in dev, S3-ready in prod via `django-storages`
+- **Optimistic UI** — status changes apply locally first, then reconcile with the server (rolled back on failure)
+- **Production hardening** — HSTS, secure cookies, CSP-aware CORS, request size caps, throttling on `/register/`, Sentry-ready
+- **Deployed for free** — Vercel + Render + Neon on free tiers, with a GitHub Actions cron to keep Render warm
+
+---
+
+## Tech stack
 
 ### Backend
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| Python | 3.12 | Core language |
-| Django | 5.1 | Web framework & ORM |
-| Django REST Framework | 3.15 | REST API layer |
-| django-cors-headers | 4.3 | Cross-origin request handling |
-| psycopg2-binary | 2.9 | PostgreSQL driver |
-| PostgreSQL | 16 | Relational database |
+| Tech | Purpose |
+|------|---------|
+| Python 3.11 | Runtime |
+| Django 5.1 | Web framework + ORM |
+| Django REST Framework | REST API + token auth |
+| drf-spectacular | OpenAPI schema + Swagger UI |
+| gunicorn | WSGI server |
+| WhiteNoise | Static-file serving |
+| dj-database-url | Postgres URL parsing |
+| psycopg2-binary | Postgres driver |
+| django-storages | S3-compatible media (optional) |
+| Sentry SDK | Error monitoring (optional) |
 
 ### Frontend
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| React | 18 | UI framework |
-| TypeScript | 5 | Type-safe JavaScript |
-| Vite | 7 | Build tool & dev server |
-| Tailwind CSS | 3 | Utility-first styling |
-| Axios | 1.x | HTTP client |
+| Tech | Purpose |
+|------|---------|
+| React 19 | UI |
+| TypeScript 5 | Type safety |
+| Vite 7 | Dev server + build |
+| Tailwind CSS 3 | Styling |
+| Axios | HTTP client with interceptors |
 
 ### Infrastructure
-| Technology | Purpose |
-|------------|---------|
-| Docker | Container runtime |
-| Docker Compose | Multi-container orchestration |
-| Git + GitHub | Version control |
+| Service | Role |
+|---------|------|
+| Vercel | Frontend hosting + CDN |
+| Render | Backend gunicorn host |
+| Neon | Managed Postgres (serverless) |
+| GitHub Actions | Cron ping to prevent Render cold starts |
+| Docker Compose | Local dev with backend + Postgres |
 
 ---
 
-## 🚀 Getting Started
+## Architecture
+
+```
+                    ┌──────────────────┐
+                    │   GitHub Actions │
+                    │  cron */10 min   │
+                    └────────┬─────────┘
+                             │ GET /healthz/
+                             ▼
+┌──────────────┐    HTTPS     ┌──────────────┐    SQL/TLS    ┌──────────────┐
+│   Browser    │─────────────▶│   Render     │──────────────▶│    Neon      │
+│              │              │              │               │              │
+│  React 19    │   POST/GET   │  Django 5.1  │   psycopg2    │  Postgres 16 │
+│  TypeScript  │   Token auth │  gunicorn    │   pooled      │  pooler.aws  │
+│  Tailwind    │              │  WhiteNoise  │               │              │
+└──────┬───────┘              └──────────────┘               └──────────────┘
+       │                       job-tracker-1-vwvl.onrender.com
+       │ static
+       ▼
+┌──────────────┐
+│   Vercel     │
+│   CDN        │
+│              │
+│ index.html   │
+│ index.js     │
+│ index.css    │
+└──────────────┘
+job-tracker-bay-one.vercel.app
+```
+
+---
+
+## Local development
+
+The fastest path is Docker Compose for the backend and `npm run dev` for the frontend.
 
 ### Prerequisites
+- Docker Desktop
+- Node.js 20+
+- Git
 
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running
-- [Node.js 20+](https://nodejs.org/) (for local frontend development)
-- [Git](https://git-scm.com/)
-
-### 1. Clone the repository
+### 1. Clone and configure
 
 ```bash
 git clone https://github.com/Kb1r/Job-Tracker.git
 cd Job-Tracker
+cp .env.example .env
 ```
 
-### 2. Start the backend (Django + PostgreSQL)
+Edit `.env` and set at minimum:
+```
+DJANGO_SECRET_KEY=<run: python3 -c "import secrets; print(secrets.token_urlsafe(50))">
+DEBUG=True
+```
+
+### 2. Start the backend
 
 ```bash
 docker compose up --build
 ```
 
-This single command will:
-- Pull the PostgreSQL 16 Docker image
-- Build the Django container
-- Run all database migrations automatically
-- Start the API server at `http://localhost:8000`
+Brings up Django on `http://localhost:8000` with a Postgres 16 sidecar. Migrations run automatically on boot.
 
-> ⏱️ First run takes 2–4 minutes to download images. Subsequent runs start in seconds.
-
-### 3. Start the frontend (React + Vite)
-
-In a new terminal:
+### 3. Start the frontend
 
 ```bash
 cd frontend
@@ -93,207 +137,170 @@ npm install
 npm run dev
 ```
 
----
+Frontend serves on `http://localhost:5173`. By default it talks to `http://localhost:8000` — override with `VITE_API_URL` in `frontend/.env.local` if needed.
 
-## 📁 Project Structure
+### 4. Create a test user
 
+Either register through the UI, or via the API:
+
+```bash
+curl -X POST http://localhost:8000/api/auth/register/ \
+  -H "Content-Type: application/json" \
+  -d '{"email":"you@example.com","password":"StrongPass123!","first_name":"You"}'
 ```
-job-tracker/
-├── backend/
-│   ├── config/
-│   │   ├── settings.py       # Django configuration
-│   │   └── urls.py           # Root URL routing
-│   ├── jobs/
-│   │   ├── migrations/       # Database migration files
-│   │   ├── models.py         # JobApplication model
-│   │   ├── serializers.py    # DRF serializers (Python ↔ JSON)
-│   │   ├── views.py          # API views (CRUD + stats)
-│   │   └── urls.py           # API URL routing
-│   ├── Dockerfile            # Backend container definition
-│   └── requirements.txt      # Python dependencies
-├── frontend/
-│   └── src/
-│       ├── api/
-│       │   └── jobs.ts       # Axios API calls
-│       ├── components/
-│       │   ├── JobModal.tsx  # Add/Edit form modal
-│       │   ├── JobTable.tsx  # Applications table
-│       │   └── StatsBar.tsx  # Status statistics bar
-│       ├── types/
-│       │   └── index.ts      # TypeScript interfaces
-│       └── App.tsx           # Root component
-├── docker-compose.yml        # Multi-container orchestration
-└── README.md
-```
+
+Response: `{"token": "abc123..."}` — paste into the `Authorization: Token abc123...` header for subsequent requests.
 
 ---
 
-## 🔌 API Reference
+## API reference
 
-Base URL: `http://localhost:8000/api`
+Base URL (prod): `https://job-tracker-1-vwvl.onrender.com`
+Base URL (local): `http://localhost:8000`
+Interactive docs: `/api/schema/swagger-ui/`
 
-### Job Applications
+### Authentication
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `POST` | `/api/auth/register/` | none | Create account, returns token. Throttled at 5/hour per IP. |
+| `POST` | `/api/auth/login/` | none | Authenticate, returns token. |
+
+All `/api/jobs/*` endpoints require `Authorization: Token <token>` header.
+
+### Jobs
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/jobs/` | List all applications |
-| `GET` | `/jobs/?status=Applied` | Filter by status |
-| `POST` | `/jobs/` | Create a new application |
-| `GET` | `/jobs/{id}/` | Get a single application |
-| `PUT` | `/jobs/{id}/` | Update an application |
-| `DELETE` | `/jobs/{id}/` | Delete an application |
-| `GET` | `/stats/` | Get counts by status |
+| `GET` | `/api/jobs/` | List the current user's applications |
+| `POST` | `/api/jobs/` | Create an application (multipart for resume upload) |
+| `GET` | `/api/jobs/{id}/` | Get one application (owner only) |
+| `PATCH` | `/api/jobs/{id}/` | Partial update |
+| `DELETE` | `/api/jobs/{id}/` | Delete |
+| `PATCH` | `/api/jobs/{id}/update-status/` | Quick status change |
+| `GET` | `/api/jobs/stats/` | Counts by status for the current user |
 
-### Example: Create a Job Application
+### Health
 
-```bash
-curl -X POST http://localhost:8000/api/jobs/ \
-  -H "Content-Type: application/json" \
-  -d '{
-    "company_name": "Acme Corp",
-    "job_title": "Backend Developer",
-    "location": "London",
-    "salary": "75000.00",
-    "status": "Applied",
-    "date_applied": "2026-03-09",
-    "notes": "Applied via LinkedIn"
-  }'
-```
-
-### Example: Stats Response
-
-```json
-{
-  "Applied": 5,
-  "Interview": 2,
-  "Offer": 1,
-  "Rejected": 3,
-  "total": 11
-}
-```
-
-### Job Application Model
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `company_name` | string | ✅ | Company name |
-| `job_title` | string | ✅ | Job title |
-| `location` | string | ✅ | Job location |
-| `salary` | decimal | ❌ | Salary (optional) |
-| `status` | enum | ✅ | Applied / Interview / Offer / Rejected |
-| `date_applied` | date | ✅ | Date of application |
-| `notes` | text | ❌ | Free-text notes |
-| `created_at` | datetime | auto | Record creation timestamp |
-| `updated_at` | datetime | auto | Last update timestamp |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/healthz/` | Liveness probe — returns `{"status":"ok"}` |
 
 ---
 
-## 🐳 Docker Architecture
+## Project structure
 
 ```
-┌─────────────────────────────────────────┐
-│           docker-compose.yml            │
-│                                         │
-│  ┌─────────────┐    ┌────────────────┐  │
-│  │   backend   │    │       db       │  │
-│  │             │───▶│                │  │
-│  │  Django     │    │  PostgreSQL 16 │  │
-│  │  Port 8000  │    │  Port 5432     │  │
-│  └─────────────┘    └────────────────┘  │
-│         ▲                    │          │
-│         │            postgres_data      │
-│         │            (named volume)     │
-└─────────┼───────────────────────────────┘
-          │
-    Your Browser
-    Port 5173 (Vite)
+job-tracker/
+├── .github/workflows/
+│   └── keep-alive.yml          # cron ping to keep Render warm
+├── backend/
+│   ├── config/
+│   │   ├── settings.py         # env-driven config; prod hardening
+│   │   └── urls.py             # /api/auth/, /api/jobs/, /healthz/
+│   ├── jobs/
+│   │   ├── auth_views.py       # Register, Login (DRF APIViews)
+│   │   ├── auth_urls.py        # /register/, /login/
+│   │   ├── models.py           # JobApplication with owner FK
+│   │   ├── serializers.py
+│   │   ├── views.py            # ViewSet filtered by request.user
+│   │   └── migrations/
+│   ├── Dockerfile
+│   └── requirements.txt
+├── frontend/
+│   └── src/
+│       ├── api/
+│       │   ├── auth.ts         # login/register
+│       │   └── jobs.ts         # CRUD + interceptors (401 → logout)
+│       ├── components/
+│       │   ├── App.tsx         # 8-line auth gate
+│       │   ├── Dashboard.tsx   # authenticated home
+│       │   ├── LoginPage.tsx   # login + register
+│       │   ├── JobModal.tsx
+│       │   ├── JobTable.tsx
+│       │   └── StatsBar.tsx
+│       ├── context/
+│       │   └── AuthContext.tsx # token persistence in localStorage
+│       └── types/
+└── docker-compose.yml
 ```
-
-- **`db`** starts first with a healthcheck
-- **`backend`** waits until `db` is healthy, then runs migrations and starts
-- **`postgres_data`** volume persists data across container restarts
 
 ---
 
-## 🛠️ Development
+## Deployment
 
-### Useful Commands
+The live demo runs on three free-tier services:
 
-```bash
-# Start everything
-docker compose up
+- **Frontend** on Vercel — auto-deploys from `main` on every push, builds the Vite bundle with `VITE_API_URL` baked in.
+- **Backend** on Render — auto-deploys from `main`, runs `python manage.py migrate --noinput && gunicorn config.wsgi` on boot.
+- **Database** on Neon — pooled Postgres connection over TLS with `channel_binding=require`.
 
-# Rebuild after dependency changes
-docker compose up --build
+A GitHub Actions cron pings `/healthz/` every 10 minutes so Render's free tier doesn't spin down between visits.
 
-# Stop everything
-docker compose down
+### Required environment variables (production)
 
-# Stop and delete the database volume (fresh start)
-docker compose down -v
+**Render (backend):**
+| Var | Example |
+|-----|---------|
+| `DJANGO_SECRET_KEY` | random 50-char string |
+| `DEBUG` | `False` |
+| `DATABASE_URL` | `postgresql://user:pw@host/db?sslmode=require` |
+| `ALLOWED_HOSTS` | `your-app.onrender.com` |
+| `CORS_ALLOWED_ORIGINS` | `https://your-frontend.vercel.app` |
+| `CSRF_TRUSTED_ORIGINS` | `https://your-frontend.vercel.app,https://your-app.onrender.com` |
+| `SENTRY_DSN` | optional |
 
-# View backend logs
-docker compose logs backend
+**Vercel (frontend):**
+| Var | Example |
+|-----|---------|
+| `VITE_API_URL` | `https://your-app.onrender.com` (no trailing slash, no path) |
 
-# Run Django management commands
-docker compose exec backend python manage.py <command>
+---
 
-# Create a superuser for Django admin
-docker compose exec backend python manage.py createsuperuser
-```
-
-### Django Admin
-
-Visit `http://localhost:8000/admin` to access the Django admin panel.
-Create a superuser first:
-```bash
-docker compose exec backend python manage.py createsuperuser
-```
-
-### Running Tests
+## Testing
 
 ```bash
-# Backend tests
+# Backend
 docker compose exec backend python manage.py test
 
-# Frontend type checking
-cd frontend && npx tsc --noEmit
+# Frontend type-check + lint
+cd frontend
+npx tsc --noEmit
+npm run lint
 ```
 
 ---
 
-## 🗺️ Roadmap
+## Roadmap
 
-- [ ] Dockerise the frontend (single `docker compose up` for everything)
+- [x] User authentication and per-user isolation
+- [x] Production deployment (Vercel + Render + Neon)
+- [x] Cold-start prevention via GitHub Actions
 - [ ] Sort table by any column
-- [ ] Export applications to CSV
-- [ ] Notes expansion on row click
-- [ ] Dark mode
-- [ ] User authentication (multi-user support)
+- [ ] CSV export
 - [ ] Email reminders for follow-ups
 - [ ] Kanban board view
+- [ ] Dark mode
 
 ---
 
-## 🧠 What I Learned Building This
+## What I learned building this
 
-- **Django ORM** — defining models, writing migrations, using `annotate` and `values` for aggregate queries
-- **Django REST Framework** — generic views, serializers, custom API endpoints
-- **React + TypeScript** — typed props, custom hooks, `useCallback` for memoised data fetching
-- **Docker Compose** — multi-container orchestration, health checks, named volumes, service dependencies
-- **CORS** — understanding why browsers block cross-origin requests and how middleware solves it
-- **REST API design** — structuring endpoints, HTTP methods, and response shapes
+- **Token-based REST auth** — DRF `TokenAuthentication`, `AllowAny` on register/login, per-user filtering with `get_queryset`, throttling registration with `AnonRateThrottle`
+- **Production Django** — env-driven settings, `dj-database-url` for portable Postgres config, WhiteNoise for static files, HSTS + secure cookies + `SECURE_PROXY_SSL_HEADER` behind a reverse proxy
+- **Free-tier deployment trade-offs** — Render cold starts, Neon's connection pooler, Vercel's build-time env vars vs Render's runtime env vars, why CORS preflight fails when origins have trailing slashes
+- **Vite build pipeline** — `import.meta.env` substitution at build time means env-var changes need a fresh build, not just a redeploy
+- **React 19 + hooks discipline** — auth gate as a tiny root component to keep all hooks inside the dashboard and never violate the Rules of Hooks
+- **Migration ordering** — adding a non-null FK to an existing table needs a data migration to delete or backfill orphans before the schema migration
 
 ---
 
-## 📄 Licence
+## Licence
 
 MIT — free to use, modify and distribute.
 
 ---
 
-## 👤 Author
+## Author
 
-**Kabir**
-- GitHub: [@Kb1r](https://github.com/Kb1r)
-- Project: [Job-Tracker](https://github.com/Kb1r/Job-Tracker)
+**Kabir Gautam** — [@Kb1r](https://github.com/Kb1r)

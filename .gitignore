@@ -24,3 +24,6 @@ frontend/tsconfig.tsbuildinfo
 
 # VS Code
 .vscode/
+
+# Cowork / Claude local session settings
+.claude/

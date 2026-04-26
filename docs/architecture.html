@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Job Tracker Architecture</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background: #020617;
+      min-height: 100vh;
+      padding: 2rem;
+      color: white;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .header {
+      margin-bottom: 2rem;
+    }
+
+    .header-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .pulse-dot {
+      width: 12px;
+      height: 12px;
+      background: #22d3ee;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+    }
+
+    .subtitle {
+      color: #94a3b8;
+      font-size: 0.875rem;
+      margin-left: 1.75rem;
+    }
+
+    .diagram-container {
+      background: rgba(15, 23, 42, 0.5);
+      border-radius: 1rem;
+      border: 1px solid #1e293b;
+      padding: 1.5rem;
+      overflow-x: auto;
+    }
+
+    svg {
+      width: 100%;
+      min-width: 900px;
+      display: block;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+
+    .card {
+      background: rgba(15, 23, 42, 0.5);
+      border-radius: 0.75rem;
+      border: 1px solid #1e293b;
+      padding: 1.25rem;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .card-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .card-dot.cyan { background: #22d3ee; }
+    .card-dot.emerald { background: #34d399; }
+    .card-dot.violet { background: #a78bfa; }
+    .card-dot.amber { background: #fbbf24; }
+    .card-dot.rose { background: #fb7185; }
+
+    .card h3 {
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+
+    .card ul {
+      list-style: none;
+      color: #94a3b8;
+      font-size: 0.75rem;
+    }
+
+    .card li {
+      margin-bottom: 0.375rem;
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 1.5rem;
+      color: #475569;
+      font-size: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-row">
+        <div class="pulse-dot"></div>
+        <h1>Job Tracker — Production Architecture</h1>
+      </div>
+      <p class="subtitle">React 19 + Django REST Framework + Postgres • Free-tier deployment on Vercel, Render, and Neon</p>
+    </div>
+
+    <!-- Main Diagram -->
+    <div class="diagram-container">
+      <svg viewBox="0 0 1000 700">
+        <!-- Definitions -->
+        <defs>
+          <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#64748b" />
+          </marker>
+          <marker id="arrowhead-rose" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#fb7185" />
+          </marker>
+          <marker id="arrowhead-amber" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#fbbf24" />
+          </marker>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+          </pattern>
+        </defs>
+
+        <!-- Background Grid -->
+        <rect width="100%" height="100%" fill="url(#grid)" />
+
+        <!-- =================================================================
+             ARROWS (drawn first so they sit behind boxes)
+             ================================================================= -->
+
+        <!-- User → Vercel (HTTPS GET static bundle) -->
+        <line x1="160" y1="350" x2="218" y2="350" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <text x="189" y="343" fill="#94a3b8" font-size="9" text-anchor="middle">HTTPS</text>
+
+        <!-- User → Render (API calls with token) -->
+        <path d="M 105 380 Q 105 470 250 470 Q 480 470 490 415" fill="none" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <text x="280" y="486" fill="#94a3b8" font-size="9">XHR + Token Auth</text>
+
+        <!-- Vercel → User (returns React bundle) -->
+        <text x="278" y="395" fill="#94a3b8" font-size="8">React 19 + Vite</text>
+
+        <!-- Render → Neon (psycopg2 / TLS) -->
+        <line x1="618" y1="370" x2="708" y2="370" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <text x="663" y="363" fill="#94a3b8" font-size="9" text-anchor="middle">TLS / pooled</text>
+
+        <!-- GitHub Actions → Render (cron ping) -->
+        <line x1="510" y1="170" x2="510" y2="288" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arrowhead-amber)"/>
+        <text x="525" y="235" fill="#fbbf24" font-size="9">GET /healthz/</text>
+
+        <!-- Auth flow (rose dashed) — Login/Register from User to Render -->
+        <path d="M 80 320 Q 80 220 250 220 Q 480 220 490 288" fill="none" stroke="#fb7185" stroke-width="1.5" stroke-dasharray="5,5" marker-end="url(#arrowhead-rose)"/>
+        <text x="280" y="213" fill="#fb7185" font-size="9">POST /api/auth/login/ → Token</text>
+
+        <!-- =================================================================
+             COMPONENTS
+             ================================================================= -->
+
+        <!-- User / Browser -->
+        <rect x="40" y="320" width="120" height="80" rx="6" fill="#0f172a"/>
+        <rect x="40" y="320" width="120" height="80" rx="6" fill="rgba(30, 41, 59, 0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+        <text x="100" y="345" fill="white" font-size="12" font-weight="600" text-anchor="middle">User</text>
+        <text x="100" y="362" fill="#94a3b8" font-size="9" text-anchor="middle">Browser / Mobile</text>
+        <text x="100" y="378" fill="#94a3b8" font-size="9" text-anchor="middle">Token in</text>
+        <text x="100" y="390" fill="#94a3b8" font-size="9" text-anchor="middle">localStorage</text>
+
+        <!-- GitHub Actions cron -->
+        <rect x="430" y="100" width="160" height="70" rx="6" fill="#0f172a"/>
+        <rect x="430" y="100" width="160" height="70" rx="6" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="510" y="125" fill="white" font-size="12" font-weight="600" text-anchor="middle">GitHub Actions</text>
+        <text x="510" y="142" fill="#94a3b8" font-size="9" text-anchor="middle">cron: */10 * * * *</text>
+        <text x="510" y="158" fill="#fbbf24" font-size="8" text-anchor="middle">keep-alive workflow</text>
+
+        <!-- Vercel (Frontend host) -->
+        <rect x="218" y="290" width="180" height="140" rx="6" fill="#0f172a"/>
+        <rect x="218" y="290" width="180" height="140" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="308" y="315" fill="white" font-size="12" font-weight="600" text-anchor="middle">Vercel CDN</text>
+        <text x="308" y="333" fill="#94a3b8" font-size="9" text-anchor="middle">React 19 + TypeScript</text>
+        <text x="308" y="348" fill="#94a3b8" font-size="9" text-anchor="middle">Tailwind 3 • Vite 7</text>
+        <text x="308" y="365" fill="#94a3b8" font-size="8" text-anchor="middle">─────────────</text>
+        <text x="308" y="380" fill="#94a3b8" font-size="8" text-anchor="middle">• AuthContext + token gate</text>
+        <text x="308" y="393" fill="#94a3b8" font-size="8" text-anchor="middle">• Axios 401 → logout</text>
+        <text x="308" y="406" fill="#94a3b8" font-size="8" text-anchor="middle">• Optimistic status updates</text>
+        <text x="308" y="423" fill="#22d3ee" font-size="8" text-anchor="middle">job-tracker-bay-one.vercel.app</text>
+
+        <!-- Render (Backend host) -->
+        <rect x="490" y="290" width="180" height="140" rx="6" fill="#0f172a"/>
+        <rect x="490" y="290" width="180" height="140" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="580" y="315" fill="white" font-size="12" font-weight="600" text-anchor="middle">Render</text>
+        <text x="580" y="333" fill="#94a3b8" font-size="9" text-anchor="middle">Django 5.1 + DRF 3.15</text>
+        <text x="580" y="348" fill="#94a3b8" font-size="9" text-anchor="middle">gunicorn • WhiteNoise</text>
+        <text x="580" y="365" fill="#94a3b8" font-size="8" text-anchor="middle">─────────────</text>
+        <text x="580" y="380" fill="#94a3b8" font-size="8" text-anchor="middle">• TokenAuthentication</text>
+        <text x="580" y="393" fill="#94a3b8" font-size="8" text-anchor="middle">• Per-user get_queryset</text>
+        <text x="580" y="406" fill="#94a3b8" font-size="8" text-anchor="middle">• HSTS + secure cookies</text>
+        <text x="580" y="423" fill="#34d399" font-size="8" text-anchor="middle">job-tracker-1-vwvl.onrender.com</text>
+
+        <!-- Neon (Postgres) -->
+        <rect x="708" y="290" width="180" height="140" rx="6" fill="#0f172a"/>
+        <rect x="708" y="290" width="180" height="140" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="798" y="315" fill="white" font-size="12" font-weight="600" text-anchor="middle">Neon</text>
+        <text x="798" y="333" fill="#94a3b8" font-size="9" text-anchor="middle">Postgres 16 (serverless)</text>
+        <text x="798" y="348" fill="#94a3b8" font-size="9" text-anchor="middle">channel_binding=require</text>
+        <text x="798" y="365" fill="#94a3b8" font-size="8" text-anchor="middle">─────────────</text>
+        <text x="798" y="380" fill="#94a3b8" font-size="8" text-anchor="middle">• auth_user</text>
+        <text x="798" y="393" fill="#94a3b8" font-size="8" text-anchor="middle">• authtoken_token</text>
+        <text x="798" y="406" fill="#94a3b8" font-size="8" text-anchor="middle">• jobs_jobapplication (FK owner)</text>
+        <text x="798" y="423" fill="#a78bfa" font-size="8" text-anchor="middle">pooled • us-east-2</text>
+
+        <!-- =================================================================
+             REQUEST FLOW DETAIL (bottom panel)
+             ================================================================= -->
+        <rect x="40" y="500" width="848" height="160" rx="8" fill="rgba(15, 23, 42, 0.6)" stroke="#1e293b" stroke-width="1"/>
+        <text x="56" y="525" fill="white" font-size="11" font-weight="600">Authenticated request lifecycle</text>
+
+        <!-- Step 1 -->
+        <circle cx="70" cy="555" r="11" fill="rgba(8, 51, 68, 0.6)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="70" y="559" fill="#22d3ee" font-size="10" font-weight="700" text-anchor="middle">1</text>
+        <text x="90" y="552" fill="white" font-size="9" font-weight="600">Browser loads bundle</text>
+        <text x="90" y="565" fill="#94a3b8" font-size="8">Vercel CDN serves index.html +</text>
+        <text x="90" y="576" fill="#94a3b8" font-size="8">hashed JS/CSS (VITE_API_URL baked in)</text>
+
+        <!-- Step 2 -->
+        <circle cx="280" cy="555" r="11" fill="rgba(136, 19, 55, 0.5)" stroke="#fb7185" stroke-width="1.5"/>
+        <text x="280" y="559" fill="#fb7185" font-size="10" font-weight="700" text-anchor="middle">2</text>
+        <text x="300" y="552" fill="white" font-size="9" font-weight="600">Login / Register</text>
+        <text x="300" y="565" fill="#94a3b8" font-size="8">POST /api/auth/login/ with email +</text>
+        <text x="300" y="576" fill="#94a3b8" font-size="8">password → DRF Token (saved client-side)</text>
+
+        <!-- Step 3 -->
+        <circle cx="490" cy="555" r="11" fill="rgba(6, 78, 59, 0.6)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="490" y="559" fill="#34d399" font-size="10" font-weight="700" text-anchor="middle">3</text>
+        <text x="510" y="552" fill="white" font-size="9" font-weight="600">CRUD via /api/jobs/</text>
+        <text x="510" y="565" fill="#94a3b8" font-size="8">Authorization: Token &lt;key&gt; — ViewSet</text>
+        <text x="510" y="576" fill="#94a3b8" font-size="8">filters .filter(owner=request.user)</text>
+
+        <!-- Step 4 -->
+        <circle cx="700" cy="555" r="11" fill="rgba(76, 29, 149, 0.6)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="700" y="559" fill="#a78bfa" font-size="10" font-weight="700" text-anchor="middle">4</text>
+        <text x="720" y="552" fill="white" font-size="9" font-weight="600">Persist to Neon</text>
+        <text x="720" y="565" fill="#94a3b8" font-size="8">psycopg2 over TLS to pooler.aws.</text>
+        <text x="720" y="576" fill="#94a3b8" font-size="8">neon.tech — JobApplication.owner FK</text>
+
+        <!-- Step 5 -->
+        <circle cx="70" cy="625" r="11" fill="rgba(120, 53, 15, 0.5)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="70" y="629" fill="#fbbf24" font-size="10" font-weight="700" text-anchor="middle">5</text>
+        <text x="90" y="622" fill="white" font-size="9" font-weight="600">Cold-start mitigation</text>
+        <text x="90" y="635" fill="#94a3b8" font-size="8">GitHub Actions hits /healthz/ every</text>
+        <text x="90" y="646" fill="#94a3b8" font-size="8">10 min so Render's free dyno stays warm</text>
+
+        <!-- Step 6 -->
+        <circle cx="350" cy="625" r="11" fill="rgba(30, 41, 59, 0.6)" stroke="#94a3b8" stroke-width="1.5"/>
+        <text x="350" y="629" fill="#94a3b8" font-size="10" font-weight="700" text-anchor="middle">6</text>
+        <text x="370" y="622" fill="white" font-size="9" font-weight="600">Production hardening</text>
+        <text x="370" y="635" fill="#94a3b8" font-size="8">HSTS • secure cookies • CORS allow-list •</text>
+        <text x="370" y="646" fill="#94a3b8" font-size="8">/register/ throttled 5/hr • Sentry-ready</text>
+
+        <!-- =================================================================
+             LEGEND (top-right)
+             ================================================================= -->
+        <text x="50" y="40" fill="white" font-size="11" font-weight="600">Job Tracker — request &amp; auth flow</text>
+        <text x="50" y="56" fill="#64748b" font-size="9">Three free-tier services, one auth boundary, zero shared state between users.</text>
+
+        <text x="730" y="40" fill="white" font-size="10" font-weight="600">Legend</text>
+
+        <rect x="730" y="50" width="14" height="10" rx="2" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1"/>
+        <text x="750" y="58" fill="#94a3b8" font-size="8">Frontend</text>
+
+        <rect x="730" y="64" width="14" height="10" rx="2" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1"/>
+        <text x="750" y="72" fill="#94a3b8" font-size="8">Backend</text>
+
+        <rect x="730" y="78" width="14" height="10" rx="2" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1"/>
+        <text x="750" y="86" fill="#94a3b8" font-size="8">Database</text>
+
+        <rect x="828" y="50" width="14" height="10" rx="2" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1"/>
+        <text x="848" y="58" fill="#94a3b8" font-size="8">Cron / Cloud</text>
+
+        <line x1="828" y1="68" x2="844" y2="68" stroke="#fb7185" stroke-width="1.5" stroke-dasharray="3,3"/>
+        <text x="848" y="72" fill="#94a3b8" font-size="8">Auth flow</text>
+
+        <line x1="828" y1="82" x2="844" y2="82" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="3,3"/>
+        <text x="848" y="86" fill="#94a3b8" font-size="8">Health probe</text>
+      </svg>
+    </div>
+
+    <!-- Info Cards -->
+    <div class="cards">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot cyan"></div>
+          <h3>Frontend (Vercel)</h3>
+        </div>
+        <ul>
+          <li>• React 19 + TypeScript 5 + Vite 7</li>
+          <li>• Tailwind CSS 3 utility classes</li>
+          <li>• Axios with 401-interceptor logout</li>
+          <li>• 8-line auth gate keeps hooks tidy</li>
+          <li>• VITE_API_URL baked in at build time</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot emerald"></div>
+          <h3>Backend (Render)</h3>
+        </div>
+        <ul>
+          <li>• Django 5.1 + DRF + gunicorn</li>
+          <li>• TokenAuthentication on /api/jobs/*</li>
+          <li>• ViewSet filters by request.user</li>
+          <li>• Migrate-on-boot via Start Command</li>
+          <li>• HSTS, secure cookies, throttling</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot violet"></div>
+          <h3>Database (Neon)</h3>
+        </div>
+        <ul>
+          <li>• Postgres 16, serverless, pooled</li>
+          <li>• TLS with channel_binding=require</li>
+          <li>• JobApplication.owner is non-null FK</li>
+          <li>• Data migration before schema change</li>
+          <li>• Free tier: 0.5 GB storage</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <p class="footer">
+      Job Tracker • Kabir Gautam • job-tracker-bay-one.vercel.app
+    </p>
+  </div>
+</body>
+</html>
