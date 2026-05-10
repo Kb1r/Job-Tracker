@@ -100,8 +100,10 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Storage — FileSystemStorage locally; S3 in production when AWS_STORAGE_BUCKET_NAME is set.
-# To enable S3: pip install django-storages[boto3] and add the AWS_* vars to your env.
+# Storage — FileSystemStorage by default; S3-compatible object storage when
+# AWS_STORAGE_BUCKET_NAME is set. Works with AWS S3, Cloudflare R2, Backblaze B2,
+# and any other S3-compatible backend. For R2, set AWS_S3_ENDPOINT_URL to the
+# R2 S3 API endpoint (https://<account-id>.r2.cloudflarestorage.com).
 STORAGES = {
     'default': {
         'BACKEND': 'django.core.files.storage.FileSystemStorage',
@@ -111,12 +113,15 @@ STORAGES = {
     },
 }
 
-if not DEBUG and env('AWS_STORAGE_BUCKET_NAME', default=''):
+if env('AWS_STORAGE_BUCKET_NAME', default=''):
     STORAGES['default'] = {'BACKEND': 'storages.backends.s3boto3.S3Boto3Storage'}
     AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID')
     AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY')
     AWS_STORAGE_BUCKET_NAME = env('AWS_STORAGE_BUCKET_NAME')
-    AWS_S3_REGION_NAME = env('AWS_S3_REGION_NAME', default='us-east-1')
+    AWS_S3_REGION_NAME = env('AWS_S3_REGION_NAME', default='auto')
+    AWS_S3_ENDPOINT_URL = env('AWS_S3_ENDPOINT_URL', default=None)
+    AWS_S3_CUSTOM_DOMAIN = env('AWS_S3_CUSTOM_DOMAIN', default=None)
+    AWS_S3_SIGNATURE_VERSION = 's3v4'
     AWS_S3_FILE_OVERWRITE = False
     AWS_DEFAULT_ACL = None
     AWS_QUERYSTRING_AUTH = False
