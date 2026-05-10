@@ -19,8 +19,5 @@ urlpatterns = [
     path('api/schema/swagger-ui/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
 ]
 
-# Serve uploaded media via Django in both dev and prod.
-# Caveat: Render's free-tier filesystem is ephemeral — uploads survive only
-# until the next deploy/restart. For durable storage, set AWS_STORAGE_BUCKET_NAME
-# (Cloudflare R2 works) and django-storages takes over via STORAGES in settings.py.
-urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
